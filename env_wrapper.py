@@ -11,12 +11,14 @@ class FlappyBirdWrapper(gym.Wrapper):
     - Resize la 84x84
     - Stack de 4 frame-uri
     - Normalizare la [0, 1]
+    - Frame skip pentru acțiuni mai consistente
     """
     
-    def __init__(self, env, img_size=84, stack_frames=4):
+    def __init__(self, env, img_size=84, stack_frames=4, frame_skip=4):
         super().__init__(env)
         self.img_size = img_size
         self.stack_frames = stack_frames
+        self.frame_skip = frame_skip  # Nou: frame skip
         
         # Deque pentru stocarea frame-urilor
         self.frames = deque(maxlen=stack_frames)
@@ -61,17 +63,19 @@ class FlappyBirdWrapper(gym.Wrapper):
         frame = self._preprocess_frame(obs)
         self.frames.append(frame)
         
-        # Reward shaping: încurajează supraviețuirea
-        # Reward original: +0.1 per frame, +1.0 per tub trecut, -1000 la moarte
-        # Facem reward-ul mai pozitiv pentru învățare
-        # Reward shaping mai agresiv
+        # Reward shaping pentru învățare mai bună
+        # Mediul oferă: +0.1 per frame, +1.0 per tub
         shaped_reward = reward
+        
+        # La moarte: penalizare mică (nu drastică)
         if terminated:
-            shaped_reward = -1  # Penalizare mica
-        elif reward > 1.0:
-            shaped_reward = 10  # Bonus mare pentru tub trecut!
-        else:
-            shaped_reward = 0.1  # Supraviețuire
+            shaped_reward = -1.0
+        # Per frame supraviețuit: reward pozitiv
+        elif reward <= 0.2:  # Doar supraviețuire
+            shaped_reward = 0.1
+        # Tub trecut: bonus mare!
+        else:  # reward >= 1.0
+            shaped_reward = 1.0
         
         return self._get_stacked_frames(), shaped_reward, terminated, truncated, info
     
