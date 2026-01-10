@@ -73,3 +73,43 @@ python test_wrapper.py
 ```
 
 Output final: **shape (4, 84, 84), dtype float32, valori în [0, 1]**
+
+## 3. Arhitectura Rețelei Neuronale
+
+### 3.1 Tip de rețea
+Convolutional Neural Network (CNN) - optimă pentru procesarea imaginilor.
+
+### 3.2 Structura modelului
+
+**Input:** `(batch, 4, 84, 84)` - 4 frame-uri grayscale de 84×84 pixeli
+
+**Convolutional Layers:**
+1. Conv1: `4 → 32` channels, kernel 8×8, stride 4, + ReLU
+2. Conv2: `32 → 64` channels, kernel 4×4, stride 2, + ReLU
+3. Conv3: `64 → 64` channels, kernel 3×3, stride 1, + ReLU
+
+**Fully Connected Layers:**
+1. FC1: `conv_output → 512` neuroni, + ReLU
+2. FC2: `512 → 2` neuroni (Q-values pentru cele 2 acțiuni)
+
+**Output:** `(batch, 2)` - Q-values pentru acțiunile `[do_nothing, jump]`
+
+### 3.3 Alegeri de design
+
+- **3 conv layers**: Suficient pentru extragerea de features din Flappy Bird (joc simplu vizual)
+- **Kernel sizes descrescătoare**: (8→4→3) pentru captarea de patterns la diferite scale
+- **ReLU activation**: Standard pentru CNN-uri, convergență rapidă
+- **512 neuroni în FC1**: Balans între capacitate și simplitate
+- **Fără dropout/batch norm**: DQN funcționează bine fără acestea pentru jocuri simple
+
+### 3.4 Parametri
+
+Modelul conține aproximativ **2-3 milioane** de parametri antrenabili, suficienți pentru task-ul dat fără risc major de overfitting (datorită replay buffer-ului).
+
+### 3.5 Verificare
+
+```bash
+python test_model.py
+```
+
+Modelul acceptă input de shape `(batch, 4, 84, 84)` și produce output `(batch, 2)`.
