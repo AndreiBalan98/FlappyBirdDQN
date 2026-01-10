@@ -257,3 +257,93 @@ python test_agent.py
 ```
 
 Agentul selectează acțiuni, învață din replay buffer și actualizează epsilon corect.
+
+## 6. Antrenare
+
+### 6.1 Pipeline de antrenare
+
+Procesul de antrenare constă din:
+
+1. **Inițializare**
+   - Crearea mediului cu wrapper de preprocesare
+   - Inițializarea agentului DQN
+   - Setup tracking pentru metrici
+
+2. **Loop principal (per episod)**
+   ```
+   Pentru fiecare episod:
+     a) Reset mediu → state inițial
+     b) Pentru fiecare step:
+        - Selectează acțiune (epsilon-greedy)
+        - Execută în mediu → (reward, next_state, done)
+        - Stochează tranziție în replay buffer
+        - Training step (dacă buffer >= batch_size)
+        - Update state
+     c) Log metrici (reward, loss, epsilon)
+     d) Salvare periodică model
+   ```
+
+3. **Finalizare**
+   - Salvare model final
+   - Salvare best model (cel cu avg reward cel mai mare)
+
+### 6.2 Hiperparametri de antrenare
+
+| Parametru | Valoare | Explicație |
+|-----------|---------|------------|
+| **Episoade** | 5,000 | Suficient pentru convergență |
+| **Max steps/episod** | 10,000 | Limită pentru episoade foarte lungi |
+| **Learning rate** | 1e-4 | Standard pentru DQN, convergență stabilă |
+| **Gamma (γ)** | 0.99 | Valorizează reward-uri viitoare |
+| **Epsilon start** | 1.0 | 100% exploration la început |
+| **Epsilon end** | 0.01 | 1% exploration la final (minim) |
+| **Epsilon decay** | 100,000 steps | Decay gradual peste ~500-1000 episoade |
+| **Batch size** | 32 | Standard pentru DQN |
+| **Replay buffer** | 100,000 | Stochează ultimele ~400-500 episoade |
+| **Target update** | 1,000 steps | Update target network la fiecare 1000 steps |
+
+### 6.3 Metrici urmărite
+
+Durante antrenării se loghează:
+- **Episode reward**: Reward cumulat per episod
+- **Average reward (100 ep)**: Media ultimelor 100 episoade (smoothing)
+- **Episode length**: Număr de steps până la terminare
+- **Loss**: MSE între Q-values și target
+- **Epsilon**: Rata curentă de exploration
+- **Buffer size**: Număr de tranziții în replay buffer
+
+### 6.4 Strategii de salvare
+
+- **Salvare periodică**: La fiecare 100 episoade → `flappy_dqn.pth`
+- **Best model**: Salvat când avg(100) reward crește → `best_flappy_dqn.pth`
+- **Checkpoint include**: Policy net, target net, optimizer state, epsilon, steps
+
+### 6.5 Resurse necesare
+
+- **Timp**: 2-4 ore pe CPU, 30min-1h pe GPU
+- **Memorie RAM**: ~2-4 GB
+- **GPU**: Opțional, dar accelerează antrenarea semnificativ
+- **Disk**: ~50 MB pentru checkpoint-uri
+
+### 6.6 Comenzi
+
+**Antrenare completă:**
+```bash
+python train.py
+```
+
+**Test rapid (50 episoade):**
+```bash
+python train_quick_test.py
+```
+
+### 6.7 Output așteptat
+
+```
+Episode   100 | Reward:  12.30 | Avg(100):   8.45 | Length:  123 | Loss: 0.0421 | ε: 0.904
+Episode   200 | Reward:  18.50 | Avg(100):  14.22 | Length:  185 | Loss: 0.0356 | ε: 0.818
+...
+Episode  1000 | Reward:  35.20 | Avg(100):  28.67 | Length:  352 | Loss: 0.0198 | ε: 0.368
+```
+
+Reward-ul crește gradual pe măsură ce agentul învață să evite tuburile.
