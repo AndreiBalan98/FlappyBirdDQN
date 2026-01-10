@@ -1,5 +1,6 @@
 import gymnasium as gym
 import flappy_bird_gymnasium
+import numpy as np
 from env_wrapper import FlappyBirdWrapper
 
 # Creează mediul cu wrapper
