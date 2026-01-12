@@ -15,7 +15,7 @@ class DQN(nn.Module):
         # Convolutional layers (adaptat pentru 32x32)
         self.conv = nn.Sequential(
             # Conv1: 4 -> 32 channels, 32x32 -> 8x8
-            nn.Conv2d(4, 32, kernel_size=4, stride=4),
+            nn.Conv2d(10, 32, kernel_size=4, stride=4),
             nn.ReLU(),
             
             # Conv2: 32 -> 64 channels, 8x8 -> 4x4
