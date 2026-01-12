@@ -8,12 +8,12 @@ class FlappyBirdWrapper(gym.Wrapper):
     """
     Wrapper pentru preprocesarea input-ului Flappy Bird:
     - conversie la grayscale
-    - resize la 84x84
+    - resize la 32x32
     - stack de 4 frames
     - normalizare la [0, 1]
     """
     
-    def __init__(self, env, img_size=64, stack_frames=10):
+    def __init__(self, env, img_size=32, stack_frames=4):
         super().__init__(env)
         self.img_size = img_size
         self.stack_frames = stack_frames
@@ -60,13 +60,6 @@ class FlappyBirdWrapper(gym.Wrapper):
         # preprocesează și adaugă noul frame
         frame = self._preprocess_frame(obs)
         self.frames.append(frame)
-        
-        # nu mai modificam reward-ul, îl lăsăm cum vine din mediu
-        # mediul deja oferă:
-        # +0.1 per frame
-        # +1.0 pentru tub trecut
-        # -1.0 la moarte
-        # -0.5 la touch top
         
         return self._get_stacked_frames(), reward, terminated, truncated, info
     
