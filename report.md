@@ -19,9 +19,11 @@ Mediul Flappy Bird este un joc 2D în care:
   - `0`: Nu face nimic (pasărea cade)
   - `1`: Jump (pasărea sare)
 - **Observații**: Imagini RGB de dimensiune variabilă (tipic 512×288×3)
-- **Reward**: 
+- **Reward** (din mediul base): 
   - +0.1 pentru fiecare frame supraviețuit
   - +1.0 pentru fiecare tub trecut
+  - -1.0 la moarte
+  - -0.5 la touch top of screen
 - **Episod terminat**: Când pasărea se lovește de tub sau de sol/tavan
 
 ### 1.4 Setup verificat
@@ -65,6 +67,7 @@ Preprocesarea este implementată printr-un wrapper Gymnasium (`FlappyBirdWrapper
 - Aplică automat transformările la fiecare `reset()` și `step()`
 - Menține un buffer (deque) cu ultimele 4 frame-uri
 - Returnează stack-ul ca input pentru agent
+- **NU modifică reward-ul** - îl lasă exact cum vine din mediu
 
 ### 2.4 Verificare
 
@@ -152,7 +155,7 @@ Clasa `ReplayBuffer`:
 ### 4.5 Parametri
 
 - **Capacitate buffer**: 100,000 tranziții
-- **Batch size**: 32 (standard pentru DQN)
+- **Batch size**: 64 (increased pentru stabilitate mai bună)
 - **Tip stocare**: numpy arrays (float32 pentru state/reward, int64 pentru action)
 
 ### 4.6 Verificare
@@ -192,7 +195,7 @@ Q(s, a) ← Q(s, a) + α[r + γ max Q(s', a') - Q(s, a)]
 **3. Epsilon-Greedy Exploration**
 - Cu probabilitate ε: acțiune random (exploration)
 - Cu probabilitate 1-ε: acțiune cu Q-value maxim (exploitation)
-- ε scade gradual: `ε_start → ε_end` (linear decay)
+- ε scade gradual: `ε_start → ε_end` (exponential decay)
 
 ### 5.3 Algoritmul pas cu pas
 
@@ -231,14 +234,14 @@ Q(s, a) ← Q(s, a) + α[r + γ max Q(s', a') - Q(s, a)]
 
 | Parametru | Valoare | Descriere |
 |-----------|---------|-----------|
-| Learning rate | 1e-4 | Rata de învățare Adam |
+| Learning rate | 5e-4 | Rata de învățare Adam (increased) |
 | Gamma (γ) | 0.99 | Discount factor |
 | Epsilon start | 1.0 | Exploration inițială (100%) |
 | Epsilon end | 0.01 | Exploration finală (1%) |
-| Epsilon decay | 100,000 | Steps pentru decay complet |
-| Batch size | 32 | Tranziții per training step |
+| Epsilon decay | 50,000 | Steps pentru decay (reduced pentru învățare mai rapidă) |
+| Batch size | 64 | Tranziții per training step (increased) |
 | Buffer capacity | 100,000 | Tranziții în replay buffer |
-| Target update freq | 1,000 | Steps între update-uri target net |
+| Target update freq | 500 | Steps între update-uri target net (reduced pentru stabilitate) |
 | Loss function | Smooth L1 (Huber) | Mai robust la outlieri |
 | Optimizer | Adam | Convergență rapidă |
 | Gradient clipping | 10 | Previne exploding gradients |
@@ -268,6 +271,7 @@ Procesul de antrenare constă din:
    - Crearea mediului cu wrapper de preprocesare
    - Inițializarea agentului DQN
    - Setup tracking pentru metrici
+   - Opțional: încărcare model existent pentru continuare
 
 2. **Loop principal (per episod)**
    ```
@@ -279,7 +283,7 @@ Procesul de antrenare constă din:
         - Stochează tranziție în replay buffer
         - Training step (dacă buffer >= batch_size)
         - Update state
-     c) Log metrici (reward, loss, epsilon)
+     c) Log metrici (reward, loss, Q-values, epsilon)
      d) Salvare periodică model
    ```
 
@@ -293,14 +297,14 @@ Procesul de antrenare constă din:
 |-----------|---------|------------|
 | **Episoade** | 5,000 | Suficient pentru convergență |
 | **Max steps/episod** | 10,000 | Limită pentru episoade foarte lungi |
-| **Learning rate** | 1e-4 | Standard pentru DQN, convergență stabilă |
+| **Learning rate** | 5e-4 | Increased pentru învățare mai rapidă |
 | **Gamma (γ)** | 0.99 | Valorizează reward-uri viitoare |
 | **Epsilon start** | 1.0 | 100% exploration la început |
 | **Epsilon end** | 0.01 | 1% exploration la final (minim) |
-| **Epsilon decay** | 100,000 steps | Decay gradual peste ~500-1000 episoade |
-| **Batch size** | 32 | Standard pentru DQN |
+| **Epsilon decay** | 50,000 steps | Reduced pentru decay mai rapid |
+| **Batch size** | 64 | Increased pentru gradient mai stabil |
 | **Replay buffer** | 100,000 | Stochează ultimele ~400-500 episoade |
-| **Target update** | 1,000 steps | Update target network la fiecare 1000 steps |
+| **Target update** | 500 steps | Reduced pentru stabilitate mai bună |
 
 ### 6.3 Metrici urmărite
 
@@ -308,7 +312,8 @@ Durante antrenării se loghează:
 - **Episode reward**: Reward cumulat per episod
 - **Average reward (100 ep)**: Media ultimelor 100 episoade (smoothing)
 - **Episode length**: Număr de steps până la terminare
-- **Loss**: MSE între Q-values și target
+- **Loss**: Huber loss între Q-values și target
+- **Average Q-value**: Media Q-values pentru batch curent
 - **Epsilon**: Rata curentă de exploration
 - **Buffer size**: Număr de tranziții în replay buffer
 
@@ -318,18 +323,21 @@ Durante antrenării se loghează:
 - **Best model**: Salvat când avg(100) reward crește → `best_flappy_dqn.pth`
 - **Checkpoint include**: Policy net, target net, optimizer state, epsilon, steps
 
-### 6.5 Resurse necesare
+### 6.5 Comenzi
 
-- **Timp**: 2-4 ore pe CPU, 30min-1h pe GPU
-- **Memorie RAM**: ~2-4 GB
-- **GPU**: Opțional, dar accelerează antrenarea semnificativ
-- **Disk**: ~50 MB pentru checkpoint-uri
-
-### 6.6 Comenzi
-
-**Antrenare completă:**
+**Antrenare nouă:**
 ```bash
 python train.py
+```
+
+**Continuare antrenare model existent:**
+```bash
+python train.py --resume flappy_dqn.pth
+```
+
+**Parametri personalizați:**
+```bash
+python train.py --episodes 10000 --save my_model.pth --save-freq 50
 ```
 
 **Test rapid (50 episoade):**
@@ -337,41 +345,51 @@ python train.py
 python train_quick_test.py
 ```
 
-### 6.7 Output așteptat
+### 6.6 Output așteptat
 
 ```
-Episode   100 | Reward:  12.30 | Avg(100):   8.45 | Length:  123 | Loss: 0.0421 | ε: 0.904
-Episode   200 | Reward:  18.50 | Avg(100):  14.22 | Length:  185 | Loss: 0.0356 | ε: 0.818
+Episode   100 | Reward:  12.30 | Avg(100):   8.45 | Length:  123 | Loss: 0.0421 | Q:  5.23 | eps: 0.818
+Episode   200 | Reward:  18.50 | Avg(100):  14.22 | Length:  185 | Loss: 0.0356 | Q:  8.45 | eps: 0.670
 ...
-Episode  1000 | Reward:  35.20 | Avg(100):  28.67 | Length:  352 | Loss: 0.0198 | ε: 0.368
+Episode  1000 | Reward:  35.20 | Avg(100):  28.67 | Length:  352 | Loss: 0.0198 | Q: 12.34 | eps: 0.135
 ```
 
 Reward-ul crește gradual pe măsură ce agentul învață să evite tuburile.
 
-## 7. Rezultate
+### 6.7 Resurse necesare
 
-### 7.1 Evoluția antrenării
+- **Timp**: 2-4 ore pe CPU, 30min-1h pe GPU
+- **Memorie RAM**: ~2-4 GB
+- **GPU**: Opțional, dar accelerează antrenarea semnificativ
+- **Disk**: ~50 MB pentru checkpoint-uri
 
-[COMPLETEAZĂ DUPĂ ANTRENARE - vezi logs din train.py]
+## 7. Evaluare
 
-- Episoade totale: 5,000
-- Timp total: X ore
-- Device folosit: CPU/GPU
+### 7.1 Comenzi de evaluare
 
-**Progresie reward:**
-- Episoade 1-100: Avg reward ~X
-- Episoade 100-500: Avg reward ~X
-- Episoade 500-1000: Avg reward ~X
-- Episoade 1000-5000: Avg reward ~X
+**Evaluare best model (10 episoade cu randare):**
+```bash
+python play.py
+```
 
-### 7.2 Evaluare finală
+**Evaluare model specific:**
+```bash
+python play.py --model flappy_dqn.pth
+```
+
+**Evaluare fără randare (mai rapid):**
+```bash
+python play.py --no-render --episodes 100
+```
+
+### 7.2 Rezultate
+
+[COMPLETEAZĂ DUPĂ ANTRENARE]
 
 **Evaluare pe best model (100 episoade fără randare):**
 ```bash
 python play.py --model best_flappy_dqn.pth --no-render --episodes 100
 ```
-
-[COMPLETEAZĂ DUPĂ EVALUARE]
 
 Rezultate:
 - Reward mediu: X.XX ± Y.YY
@@ -379,25 +397,7 @@ Rezultate:
 - Reward min: X.XX
 - Episoade cu reward > 30: X% (obiectiv atins: DA/NU)
 
-### 7.3 Observații
-
-[COMPLETEAZĂ DUPĂ ANTRENARE]
-
-Comportament observat:
-- Agentul învață să...
-- Erori frecvente...
-- Strategii identificate...
-
-### 7.4 Vizualizare
-
-**Demo cu randare:**
-```bash
-python play.py --episodes 10
-```
-
-Se poate observa că agentul [descriere comportament].
-
-### 7.5 Comparație cu baseline
+### 7.3 Comparație cu baseline
 
 - **Agent random**: ~1-3 puncte (moare rapid)
 - **Agent antrenat**: ~X puncte (de X ori mai bun)

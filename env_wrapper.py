@@ -7,11 +7,10 @@ from PIL import Image
 class FlappyBirdWrapper(gym.Wrapper):
     """
     Wrapper pentru preprocesarea input-ului Flappy Bird:
-    - Conversie la grayscale
-    - Resize la 84x84
-    - Stack de 4 frame-uri
-    - Normalizare la [0, 1]
-    - Action penalty pentru jump spam
+    - conversie la grayscale
+    - resize la 84x84
+    - stack de 4 frames
+    - normalizare la [0, 1]
     """
     
     def __init__(self, env, img_size=84, stack_frames=4):
@@ -19,14 +18,10 @@ class FlappyBirdWrapper(gym.Wrapper):
         self.img_size = img_size
         self.stack_frames = stack_frames
         
-        # Deque pentru stocarea frame-urilor
+        # deque pentru stocarea frame-urilor
         self.frames = deque(maxlen=stack_frames)
         
-        # Tracking pentru action penalty
-        self.last_action = 0
-        self.consecutive_jumps = 0
-        
-        # Actualizează observation space
+        # actualizează observation space
         self.observation_space = gym.spaces.Box(
             low=0.0,
             high=1.0,
@@ -35,14 +30,14 @@ class FlappyBirdWrapper(gym.Wrapper):
         )
     
     def _preprocess_frame(self, frame):
-        """Conversie RGB -> Grayscale -> Resize -> Normalize"""
-        # Conversie la grayscale
+        """conversie RGB -> grayscale -> resize -> normalize"""
+        # conversie la grayscale
         img = Image.fromarray(frame).convert('L')
         
-        # Resize
+        # resize
         img = img.resize((self.img_size, self.img_size), Image.BILINEAR)
         
-        # Conversie la numpy și normalizare
+        # conversie la numpy și normalizare
         frame = np.array(img, dtype=np.float32) / 255.0
         
         return frame
@@ -50,14 +45,10 @@ class FlappyBirdWrapper(gym.Wrapper):
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
         
-        # Reset action tracking
-        self.last_action = 0
-        self.consecutive_jumps = 0
-        
-        # Preprocesează frame-ul inițial
+        # preprocesează frame-ul inițial
         frame = self._preprocess_frame(obs)
         
-        # Umple stack-ul cu același frame
+        # umple stack-ul cu același frame
         for _ in range(self.stack_frames):
             self.frames.append(frame)
         
@@ -66,39 +57,19 @@ class FlappyBirdWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
         
-        # Preprocesează și adaugă noul frame
+        # preprocesează și adaugă noul frame
         frame = self._preprocess_frame(obs)
         self.frames.append(frame)
         
-        # Reward shaping pentru învățare mai bună
-        shaped_reward = reward
+        # nu mai modificam reward-ul, îl lăsăm cum vine din mediu
+        # mediul deja oferă:
+        # +0.1 per frame
+        # +1.0 pentru tub trecut
+        # -1.0 la moarte
+        # -0.5 la touch top
         
-        # Penalizare la moarte
-        if terminated:
-            shaped_reward = -1.0
-        # Per frame supraviețuit
-        elif reward <= 0.2:
-            shaped_reward = 0.1
-        # Tub trecut - bonus mare!
-        else:
-            shaped_reward = 1.0
-        
-        # ACTION PENALTY: Penalizează jump-uri consecutive excesive
-        if action == 1:  # Jump
-            if self.last_action == 1:
-                self.consecutive_jumps += 1
-                # Penalizare crescătoare pentru spam
-                shaped_reward -= 0.05 * self.consecutive_jumps
-            else:
-                self.consecutive_jumps = 1
-        else:  # Do nothing
-            self.consecutive_jumps = 0
-        
-        # Update last action
-        self.last_action = action
-        
-        return self._get_stacked_frames(), shaped_reward, terminated, truncated, info
+        return self._get_stacked_frames(), reward, terminated, truncated, info
     
     def _get_stacked_frames(self):
-        """Returnează stack-ul de frame-uri ca array numpy"""
+        """returnează stack-ul de frame-uri ca array numpy"""
         return np.stack(self.frames, axis=0)
