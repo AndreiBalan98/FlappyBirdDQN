@@ -32,17 +32,17 @@ def train_dqn(
     # Creează agentul
     agent = DQNAgent(
         n_actions=2,
-        lr=1e-4,
+        lr=1e-3,
         gamma=0.99,
-        epsilon_start=1.0,
-        epsilon_end=0.01,
-        epsilon_decay=100000,
+        epsilon_start=0.05,
+        epsilon_end=0.00,
+        epsilon_decay=10000,
         buffer_capacity=100000,
         batch_size=32,
-        target_update_freq=1000
+        target_update_freq=2500
     )
     
-    print(f"🎮 Training DQN pe Flappy Bird")
+    print(f"Training DQN pe Flappy Bird")
     print(f"   Device: {agent.device}")
     print(f"   Episoade: {n_episodes}")
     print(f"   Save frequency: {save_freq} episoade")
@@ -100,7 +100,7 @@ def train_dqn(
             print(f"Episode {episode:5d} | "
                   f"Reward: {episode_reward:6.2f} | "
                   f"Avg(100): {avg_reward:6.2f} | "
-                  f"Length: {episode_length:4d} | "
+                  f"Length: {episode_length:.2f} | "
                   f"Loss: {avg_loss:.4f} | "
                   f"ε: {agent.epsilon:.3f} | "
                   f"Buffer: {len(agent.memory):6d} | "
@@ -135,7 +135,7 @@ def train_dqn(
 if __name__ == "__main__":
     # Antrenare
     rewards, lengths = train_dqn(
-        n_episodes=5000,
+        n_episodes=500,
         max_steps_per_episode=10000,
         save_freq=100,
         log_freq=10,

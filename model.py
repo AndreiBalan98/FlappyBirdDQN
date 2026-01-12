@@ -15,7 +15,7 @@ class DQN(nn.Module):
         # Convolutional layers
         self.conv = nn.Sequential(
             # Conv1: 4 -> 32 channels
-            nn.Conv2d(4, 32, kernel_size=8, stride=4),
+            nn.Conv2d(10, 32, kernel_size=8, stride=4),
             nn.ReLU(),
             
             # Conv2: 32 -> 64 channels
@@ -28,7 +28,7 @@ class DQN(nn.Module):
         )
         
         # Calculează dimensiunea output-ului conv layers
-        conv_out_size = self._get_conv_output_size((4, 84, 84))
+        conv_out_size = self._get_conv_output_size((10, 64, 64))
         
         # Fully connected layers
         self.fc = nn.Sequential(

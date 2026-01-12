@@ -138,6 +138,7 @@ class DQNAgent:
         
         self.optimizer.zero_grad()
         loss.backward()
+        
         # Gradient clipping pentru stabilitate
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 10)
         self.optimizer.step()
