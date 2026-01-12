@@ -28,7 +28,7 @@ class DQN(nn.Module):
         )
         
         # Calculează dimensiunea output-ului conv layers
-        conv_out_size = self._get_conv_output_size((4, 32, 32))
+        conv_out_size = self._get_conv_output_size((10, 32, 32))
         
         # Fully connected layers
         self.fc = nn.Sequential(
