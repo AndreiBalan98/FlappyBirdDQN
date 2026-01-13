@@ -7,7 +7,7 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         
         self.conv = nn.Sequential(
-            nn.Conv2d(10, 32, kernel_size=4, stride=4),
+            nn.Conv2d(4, 32, kernel_size=4, stride=4),
             nn.ReLU(),
             
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
@@ -17,7 +17,7 @@ class DQN(nn.Module):
             nn.ReLU()
         )
         
-        conv_out_size = self._get_conv_output_size((10, 32, 32))
+        conv_out_size = self._get_conv_output_size((4, 64, 64))
         
         self.fc = nn.Sequential(
             nn.Linear(conv_out_size, 512),
