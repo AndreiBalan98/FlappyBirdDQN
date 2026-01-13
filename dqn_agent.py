@@ -7,11 +7,6 @@ from replay_buffer import ReplayBuffer
 
 
 class DQNAgent:
-    """
-    Agent DQN pentru Flappy Bird.
-    Folosește policy network + target network și epsilon-greedy biased (prefer action 0).
-    """
-    
     def __init__(
         self,
         n_actions=2,
@@ -50,19 +45,13 @@ class DQNAgent:
         self.steps_done = 0
     
     def select_action(self, state, training=True):
-        """
-        Selectează acțiune folosind epsilon-greedy BIASED.
-        
-        Returns:
-            (action, q_values_list)
-        """
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             q_values = self.policy_net(state_tensor)
             q_values_list = q_values.cpu().numpy()[0].tolist()
         
         if training and np.random.rand() < self.epsilon:
-            return 0, q_values_list  # bias către action 0
+            return 0, q_values_list
         else:
             action = q_values.argmax(dim=1).item()
             return action, q_values_list
