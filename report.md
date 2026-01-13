@@ -1,403 +1,59 @@
-# Flappy Bird DQN - Raport Tehnic
+# Raport Proiect: Flappy Bird DQN
 
-## 1. Introducere
+## 1. Introducere si Obiective
 
-### 1.1 Obiectiv
-Implementarea unui agent de reinforcement learning pentru jocul Flappy Bird folosind algoritmul DQN (Deep Q-Network) cu input pe pixeli. Scopul este antrenarea unui agent capabil să obțină un punctaj de peste 30 de puncte.
+* **Scop**: Crearea unui agent de Reinforcement Learning capabil sa joace Flappy Bird folosind doar imaginea (pixelii).
+* **Target**: Obtinerea unui scor de peste 30 de puncte.
+* **Tehnologii**: Python, PyTorch, Gymnasium.
 
-### 1.2 Mediul de lucru
-- **Joc**: Flappy Bird
-- **Framework mediu**: flappy-bird-gymnasium (compatibil Gymnasium/OpenAI Gym)
-- **Framework deep learning**: PyTorch
-- **Limbaj**: Python 3.x
+## 2. Preprocesarea Datelor
 
-### 1.3 Descrierea mediului
+Pentru a face antrenarea eficienta, imaginile brute de 512x288 sunt transformate astfel:
 
-Mediul Flappy Bird este un joc 2D în care:
-- **Obiectiv**: Pasărea trebuie să treacă prin tuburi fără să se lovească
-- **Spațiu de acțiuni**: 2 acțiuni discrete
-  - `0`: Nu face nimic (pasărea cade)
-  - `1`: Jump (pasărea sare)
-- **Observații**: Imagini RGB de dimensiune variabilă (tipic 512×288×3)
-- **Reward** (din mediul base): 
-  - +0.1 pentru fiecare frame supraviețuit
-  - +1.0 pentru fiecare tub trecut
-  - -1.0 la moarte
-  - -0.5 la touch top of screen
-- **Episod terminat**: Când pasărea se lovește de tub sau de sol/tavan
+* **Grayscale**: Eliminam culorile inutile.
+* **Resize**: Reducem la 84x84 pixeli.
+* **Normalizare**: Valorile pixelilor trec de la [0, 255] la [0, 1].
+* **Frame Stacking**: Grupam ultimele 4 cadre consecutive intr-un singur input (shape 4x84x84) pentru ca agentul sa poata percepe directia si viteza pasarii.
 
-### 1.4 Setup verificat
-```bash
-pip install -r requirements.txt
-python test_env.py
-```
+## 3. Arhitectura Retelei (CNN)
 
-Mediul rulează corect și oferă observații de tip imagine RGB.
+Am folosit o retea neuronala convolutionala (CNN) cu urmatoarea structura:
 
-## 2. Preprocesarea Input-ului
+1. **3 Straturi Convolutionale**: Extrag trasaturile vizuale (tuburi, pozitia pasarii).
+2. **2 Straturi Fully Connected**: Primul strat are 512 neuroni, iar ultimul are 2 neuroni (corespunzatori actiunilor: *stay* sau *jump*).
+3. **Activare**: ReLU pentru straturile intermediare.
 
-### 2.1 Motivație
-Imaginile RGB originale (512×288×3) sunt prea mari și conțin informații redundante pentru învățare. Preprocesarea reduce dimensiunea input-ului și păstrează doar informația esențială.
+## 4. Algoritmul si Strategia de Invatare
 
-### 2.2 Pipeline de preprocesare
+* **DQN (Deep Q-Network)**: Reteaua invata sa estimeze valoarea Q (cat de buna este o actiune intr-o anumita stare).
+* **Experience Replay**: Folosim un buffer de 100.000 de experiente din care extragem batch-uri aleatorii (64 de sample-uri) pentru a sparge corelatia dintre cadre consecutive.
+* **Target Network**: O a doua retea, actualizata mai rar (la 500 pasi), folosita pentru stabilitatea calculului erorii (loss).
+* **Epsilon-Greedy**: Agentul incepe prin a explora total (epsilon=1.0) si ajunge treptat la o explorare minima (epsilon=0.01).
 
-Fiecare frame trece prin următoarele transformări:
+## 5. Antrenare si Parametri
 
-1. **Conversie la Grayscale**
-   - RGB (3 canale) → Grayscale (1 canal)
-   - Culoarea nu este esențială pentru joc
+* **Learning Rate**: 5e-4.
+* **Discount Factor (Gamma)**: 0.99 (agentul prioritizeaza recompensele pe termen lung).
+* **Optimizer**: Adam cu Huber Loss (mai stabil la valori extreme).
+* **Durata**: Antrenat pe parcursul a 5.000 de episoade.
 
-2. **Resize la 84×84 pixeli**
-   - Reduce dimensiunea de la 512×288 la 84×84
-   - Păstrează proporțiile relevante ale jocului
-   - Reduce numărul de parametri ai rețelei
+## 6. Rezultate si Evaluare
 
-3. **Normalizare**
-   - Pixeli de la [0, 255] → [0, 1]
-   - Facilitează antrenarea rețelei neuronale
+* **Dupa 20 episoade**:
+============================================================
+statistici:
+   reward mediu:  -1.43 ± 0.73
+   reward max:    -0.90
+   reward min:    -2.50
+   length mediu:  53
+============================================================
 
-4. **Frame Stacking**
-   - Se stochează ultimele 4 frame-uri consecutive
-   - Oferă informație despre mișcare și viteză
-   - Input final: **(4, 84, 84)**
-
-### 2.3 Implementare
-
-Preprocesarea este implementată printr-un wrapper Gymnasium (`FlappyBirdWrapper`) care:
-- Aplică automat transformările la fiecare `reset()` și `step()`
-- Menține un buffer (deque) cu ultimele 4 frame-uri
-- Returnează stack-ul ca input pentru agent
-- **NU modifică reward-ul** - îl lasă exact cum vine din mediu
-
-### 2.4 Verificare
-
-```bash
-python test_wrapper.py
-```
-
-Output final: **shape (4, 84, 84), dtype float32, valori în [0, 1]**
-
-## 3. Arhitectura Rețelei Neuronale
-
-### 3.1 Tip de rețea
-Convolutional Neural Network (CNN) - optimă pentru procesarea imaginilor.
-
-### 3.2 Structura modelului
-
-**Input:** `(batch, 4, 84, 84)` - 4 frame-uri grayscale de 84×84 pixeli
-
-**Convolutional Layers:**
-1. Conv1: `4 → 32` channels, kernel 8×8, stride 4, + ReLU
-2. Conv2: `32 → 64` channels, kernel 4×4, stride 2, + ReLU
-3. Conv3: `64 → 64` channels, kernel 3×3, stride 1, + ReLU
-
-**Fully Connected Layers:**
-1. FC1: `conv_output → 512` neuroni, + ReLU
-2. FC2: `512 → 2` neuroni (Q-values pentru cele 2 acțiuni)
-
-**Output:** `(batch, 2)` - Q-values pentru acțiunile `[do_nothing, jump]`
-
-### 3.3 Alegeri de design
-
-- **3 conv layers**: Suficient pentru extragerea de features din Flappy Bird (joc simplu vizual)
-- **Kernel sizes descrescătoare**: (8→4→3) pentru captarea de patterns la diferite scale
-- **ReLU activation**: Standard pentru CNN-uri, convergență rapidă
-- **512 neuroni în FC1**: Balans între capacitate și simplitate
-- **Fără dropout/batch norm**: DQN funcționează bine fără acestea pentru jocuri simple
-
-### 3.4 Parametri
-
-Modelul conține aproximativ **2-3 milioane** de parametri antrenabili, suficienți pentru task-ul dat fără risc major de overfitting (datorită replay buffer-ului).
-
-### 3.5 Verificare
-
-```bash
-python test_model.py
-```
-
-Modelul acceptă input de shape `(batch, 4, 84, 84)` și produce output `(batch, 2)`.
-
-## 4. Experience Replay Buffer
-
-### 4.1 Motivație
-
-În Q-learning clasic, agentul învață imediat din fiecare experiență (s, a, r, s'). Acest lucru creează două probleme:
-- **Corelație temporală**: Experiențele consecutive sunt foarte similare
-- **Ineficiență**: Fiecare experiență este folosită o singură dată
-
-Experience Replay rezolvă ambele probleme.
-
-### 4.2 Principiu de funcționare
-
-Replay Buffer-ul este o structură de tip **FIFO (First-In-First-Out)** cu capacitate fixă:
-1. Stochează tranziții `(state, action, reward, next_state, done)`
-2. Când e plin, cele mai vechi tranziții sunt șterse automat
-3. La fiecare pas de antrenare, se sample aleator un **batch** de tranziții
-4. Rețeaua învață din acest batch, nu din experiențe consecutive
-
-### 4.3 Avantaje
-
-- **Decorelează experiențele**: Sampling aleator elimină corelația temporală
-- **Reutilizare**: Fiecare experiență poate fi folosită în multiple batch-uri
-- **Stabilitate**: Gradient-ul este mai stabil (mediere peste experiențe diverse)
-- **Eficiență**: Învață mai repede din același număr de interacțiuni cu mediul
-
-### 4.4 Implementare
-
-Clasa `ReplayBuffer`:
-- **Capacitate**: 100,000 tranziții (configurabil)
-- **Structură**: `collections.deque` (efficient pentru FIFO)
-- **Metode**:
-  - `push(s, a, r, s', done)`: Adaugă tranziție
-  - `sample(batch_size)`: Returnează batch aleator
-  - `__len__()`: Număr curent de tranziții
-
-### 4.5 Parametri
-
-- **Capacitate buffer**: 100,000 tranziții
-- **Batch size**: 64 (increased pentru stabilitate mai bună)
-- **Tip stocare**: numpy arrays (float32 pentru state/reward, int64 pentru action)
-
-### 4.6 Verificare
-
-```bash
-python test_replay_buffer.py
-```
-
-Buffer-ul stochează și samplează corect tranziții, respectând capacitatea maximă.
-
-## 5. Algoritmul DQN
-
-### 5.1 Principiul DQN
-
-DQN (Deep Q-Network) combină Q-learning cu rețele neuronale profunde:
-- **Q-learning**: Algoritm clasic de RL pentru învățarea funcției Q(s, a)
-- **Deep Neural Network**: Aproximează Q(s, a) pentru spații de stări mari (imagini)
-
-Ecuația Bellman pentru Q-learning:
-```
-Q(s, a) ← Q(s, a) + α[r + γ max Q(s', a') - Q(s, a)]
-                              a'
-```
-
-### 5.2 Componente principale
-
-**1. Policy Network**
-- Rețeaua care învață activ
-- Primește state și returnează Q-values pentru toate acțiunile
-- Se actualizează la fiecare training step
-
-**2. Target Network**
-- Copie a policy network, actualizată periodic
-- Folosită pentru calcularea target Q-values
-- Stabilizează antrenarea (evită "moving target problem")
-
-**3. Epsilon-Greedy Exploration**
-- Cu probabilitate ε: acțiune random (exploration)
-- Cu probabilitate 1-ε: acțiune cu Q-value maxim (exploitation)
-- ε scade gradual: `ε_start → ε_end` (exponential decay)
-
-### 5.3 Algoritmul pas cu pas
-
-```
-1. Inițializare:
-   - Policy network cu ponderi random
-   - Target network = copie policy network
-   - Replay buffer gol
-   - ε = ε_start
-
-2. Pentru fiecare episod:
-   a) Observă state s
-   
-   b) Selectează acțiune:
-      - Cu prob. ε: acțiune random
-      - Altfel: a = argmax Q(s, a)
-                      a
-   
-   c) Execută acțiune, observă (r, s', done)
-   
-   d) Stochează (s, a, r, s', done) în buffer
-   
-   e) Dacă buffer >= batch_size:
-      - Sample batch aleator
-      - Calculează: target = r + γ max Q_target(s', a')  [dacă not done]
-                                  a'
-      - Loss = (Q_policy(s, a) - target)²
-      - Backprop și update policy network
-      - Scade ε
-   
-   f) La fiecare N steps:
-      - Target network ← Policy network
-```
-
-### 5.4 Hiperparametri
-
-| Parametru | Valoare | Descriere |
-|-----------|---------|-----------|
-| Learning rate | 5e-4 | Rata de învățare Adam (increased) |
-| Gamma (γ) | 0.99 | Discount factor |
-| Epsilon start | 1.0 | Exploration inițială (100%) |
-| Epsilon end | 0.01 | Exploration finală (1%) |
-| Epsilon decay | 50,000 | Steps pentru decay (reduced pentru învățare mai rapidă) |
-| Batch size | 64 | Tranziții per training step (increased) |
-| Buffer capacity | 100,000 | Tranziții în replay buffer |
-| Target update freq | 500 | Steps între update-uri target net (reduced pentru stabilitate) |
-| Loss function | Smooth L1 (Huber) | Mai robust la outlieri |
-| Optimizer | Adam | Convergență rapidă |
-| Gradient clipping | 10 | Previne exploding gradients |
-
-### 5.5 Tehnici de stabilizare
-
-1. **Experience Replay**: Decorelează experiențele
-2. **Target Network**: Fixează target-ul pentru stabilitate
-3. **Gradient Clipping**: Previne divergența
-4. **Huber Loss**: Mai robust decât MSE
-
-### 5.6 Verificare
-
-```bash
-python test_agent.py
-```
-
-Agentul selectează acțiuni, învață din replay buffer și actualizează epsilon corect.
-
-## 6. Antrenare
-
-### 6.1 Pipeline de antrenare
-
-Procesul de antrenare constă din:
-
-1. **Inițializare**
-   - Crearea mediului cu wrapper de preprocesare
-   - Inițializarea agentului DQN
-   - Setup tracking pentru metrici
-   - Opțional: încărcare model existent pentru continuare
-
-2. **Loop principal (per episod)**
-   ```
-   Pentru fiecare episod:
-     a) Reset mediu → state inițial
-     b) Pentru fiecare step:
-        - Selectează acțiune (epsilon-greedy)
-        - Execută în mediu → (reward, next_state, done)
-        - Stochează tranziție în replay buffer
-        - Training step (dacă buffer >= batch_size)
-        - Update state
-     c) Log metrici (reward, loss, Q-values, epsilon)
-     d) Salvare periodică model
-   ```
-
-3. **Finalizare**
-   - Salvare model final
-   - Salvare best model (cel cu avg reward cel mai mare)
-
-### 6.2 Hiperparametri de antrenare
-
-| Parametru | Valoare | Explicație |
-|-----------|---------|------------|
-| **Episoade** | 5,000 | Suficient pentru convergență |
-| **Max steps/episod** | 10,000 | Limită pentru episoade foarte lungi |
-| **Learning rate** | 5e-4 | Increased pentru învățare mai rapidă |
-| **Gamma (γ)** | 0.99 | Valorizează reward-uri viitoare |
-| **Epsilon start** | 1.0 | 100% exploration la început |
-| **Epsilon end** | 0.01 | 1% exploration la final (minim) |
-| **Epsilon decay** | 50,000 steps | Reduced pentru decay mai rapid |
-| **Batch size** | 64 | Increased pentru gradient mai stabil |
-| **Replay buffer** | 100,000 | Stochează ultimele ~400-500 episoade |
-| **Target update** | 500 steps | Reduced pentru stabilitate mai bună |
-
-### 6.3 Metrici urmărite
-
-Durante antrenării se loghează:
-- **Episode reward**: Reward cumulat per episod
-- **Average reward (100 ep)**: Media ultimelor 100 episoade (smoothing)
-- **Episode length**: Număr de steps până la terminare
-- **Loss**: Huber loss între Q-values și target
-- **Average Q-value**: Media Q-values pentru batch curent
-- **Epsilon**: Rata curentă de exploration
-- **Buffer size**: Număr de tranziții în replay buffer
-
-### 6.4 Strategii de salvare
-
-- **Salvare periodică**: La fiecare 100 episoade → `flappy_dqn.pth`
-- **Best model**: Salvat când avg(100) reward crește → `best_flappy_dqn.pth`
-- **Checkpoint include**: Policy net, target net, optimizer state, epsilon, steps
-
-### 6.5 Comenzi
-
-**Antrenare nouă:**
-```bash
-python train.py
-```
-
-**Continuare antrenare model existent:**
-```bash
-python train.py --resume flappy_dqn.pth
-```
-
-**Parametri personalizați:**
-```bash
-python train.py --episodes 10000 --save my_model.pth --save-freq 50
-```
-
-**Test rapid (50 episoade):**
-```bash
-python train_quick_test.py
-```
-
-### 6.6 Output așteptat
-
-```
-Episode   100 | Reward:  12.30 | Avg(100):   8.45 | Length:  123 | Loss: 0.0421 | Q:  5.23 | eps: 0.818
-Episode   200 | Reward:  18.50 | Avg(100):  14.22 | Length:  185 | Loss: 0.0356 | Q:  8.45 | eps: 0.670
-...
-Episode  1000 | Reward:  35.20 | Avg(100):  28.67 | Length:  352 | Loss: 0.0198 | Q: 12.34 | eps: 0.135
-```
-
-Reward-ul crește gradual pe măsură ce agentul învață să evite tuburile.
-
-### 6.7 Resurse necesare
-
-- **Timp**: 2-4 ore pe CPU, 30min-1h pe GPU
-- **Memorie RAM**: ~2-4 GB
-- **GPU**: Opțional, dar accelerează antrenarea semnificativ
-- **Disk**: ~50 MB pentru checkpoint-uri
-
-## 7. Evaluare
-
-### 7.1 Comenzi de evaluare
-
-**Evaluare best model (10 episoade cu randare):**
-```bash
-python play.py
-```
-
-**Evaluare model specific:**
-```bash
-python play.py --model flappy_dqn.pth
-```
-
-**Evaluare fără randare (mai rapid):**
-```bash
-python play.py --no-render --episodes 100
-```
-
-### 7.2 Rezultate
-
-[COMPLETEAZĂ DUPĂ ANTRENARE]
-
-**Evaluare pe best model (100 episoade fără randare):**
-```bash
-python play.py --model best_flappy_dqn.pth --no-render --episodes 100
-```
-
-Rezultate:
-- Reward mediu: X.XX ± Y.YY
-- Reward max: X.XX
-- Reward min: X.XX
-- Episoade cu reward > 30: X% (obiectiv atins: DA/NU)
-
-### 7.3 Comparație cu baseline
-
-- **Agent random**: ~1-3 puncte (moare rapid)
-- **Agent antrenat**: ~X puncte (de X ori mai bun)
+* **Dupa 250 episoade**:
+============================================================
+statistici:
+   reward mediu:  -0.58 ± 0.90
+   reward max:    2.30
+   reward min:    -1.80
+   length mediu:  53
+============================================================
+---
