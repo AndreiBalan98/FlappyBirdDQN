@@ -39,7 +39,7 @@ Am folosit o retea neuronala convolutionala (CNN) cu urmatoarea structura:
 
 ## 6. Rezultate si Evaluare
 
-* **Dupa 20 episoade**:
+* **Dupa 20 episoade**: (100 episoade)
 ============================================================
 statistici:
    reward mediu:  -1.43 ± 0.73
@@ -48,7 +48,7 @@ statistici:
    length mediu:  53
 ============================================================
 
-* **Dupa 250 episoade**:
+* **Dupa 250 episoade**: (100 episoade)
 ============================================================
 statistici:
    reward mediu:  -0.58 ± 0.90
@@ -56,4 +56,14 @@ statistici:
    reward min:    -1.80
    length mediu:  53
 ============================================================
+
+* **Dupa 500 episoade**: (100 episoade)
+============================================================
+statistici:
+   reward mediu:  1.47 ± 1.46
+   reward max:    3.20
+   reward min:    -0.90
+   length mediu:  54
+============================================================
+
 ---

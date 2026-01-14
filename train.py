@@ -20,11 +20,11 @@ def train_dqn(
     
     agent = DQNAgent(
         n_actions=2,
-        lr=1e-3,
+        lr=1e-4,
         gamma=0.99,
         epsilon_start=0.80,
         epsilon_end=0.00,
-        epsilon_decay=100000,
+        epsilon_decay=25000,
         buffer_capacity=100000,
         batch_size=32,
         target_update_freq=2500
@@ -111,7 +111,7 @@ def train_dqn(
 
 if __name__ == "__main__":
     rewards, lengths = train_dqn(
-        n_episodes=500,
+        n_episodes=1000,
         max_steps_per_episode=10000,
         save_freq=100,
         log_freq=10,
